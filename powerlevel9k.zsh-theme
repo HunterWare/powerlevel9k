@@ -763,7 +763,6 @@ prompt_command_execution_time() {
 ################################################################
 # Determine the unique path - this is needed for the
 # truncate_to_unique strategy.
-#
 function getUniqueFolder() {
   local trunc_path directory test_dir test_dir_length
   local -a matching
@@ -771,16 +770,25 @@ function getUniqueFolder() {
   local cur_path='/'
   paths=(${(s:/:)1})
   for directory in ${paths[@]}; do
-    test_dir=''
-    for (( i=0; i < ${#directory}; i++ )); do
-      test_dir+="${directory:$i:1}"
-      matching=("$cur_path"/"$test_dir"*/)
-      if [[ ${#matching[@]} -eq 1 ]]; then
-        break
-      fi
-    done
-    trunc_path+="$test_dir/"
-    cur_path+="$directory/"
+    if [[ ${directory} == "~" ]]; then
+      trunc_path='~/'
+      cur_path="${HOME}/"
+    elif [[ ${POWERLEVEL9K_SHORTEN_DIR_LENGTH} -gt "0" &&
+            -n ${${paths[-$POWERLEVEL9K_SHORTEN_DIR_LENGTH,-1]}[(r)$directory]} ]]; then
+      trunc_path+="$directory/"
+      cur_path+="$directory/"
+    else
+      test_dir=''
+      for (( i=0; i < ${#directory}; i++ )); do
+        test_dir+="${directory:$i:1}"
+        matching=("$cur_path"/"$test_dir"*/)
+        if [[ ${#matching[@]} -eq 1 ]]; then
+          break
+        fi
+      done
+      trunc_path+="$test_dir/"
+      cur_path+="$directory/"
+    fi
   done
   echo "${trunc_path: : -1}"
 }
@@ -852,10 +860,7 @@ prompt_dir() {
         # for each parent path component find the shortest unique beginning
         # characters sequence. Source: https://stackoverflow.com/a/45336078
         if (( ${#current_path} > 1 )); then # root and home are exceptions and won't have paths
-          # cheating here to retain ~ as home folder
-          local home_path="$(getUniqueFolder $HOME)"
-          trunc_path="$(getUniqueFolder $PWD)"
-          [[ $current_path == "~"* ]] && current_path="~${trunc_path//${home_path}/}" || current_path="/${trunc_path}"
+          current_path="$(getUniqueFolder ${current_path})"
         fi
       ;;
       truncate_with_folder_marker)
